@@ -4,12 +4,7 @@ import java.time.Year;
 
 public class AccountUtils {
 
-    public static final String ACCOUNT_EXISTS_CODE = "001";
-    public static final String ACCOUNT_CREATED_SUCCESS = "002";
-    public static final String ACCOUNT_FETCH_CODE = "003";
-    public static final String ACCOUNT_EXISTS_MESSAGE = "This user already exists.!!!";
-    public static final String ACCOUNT_CREATED_MESSAGE = "Account Created successfully";
-    public static final String ACCOUNT_FETCH_MESSAGE = "Account details fetched successfully";
+
 
     public static String generateAccountNumber() {
         /**

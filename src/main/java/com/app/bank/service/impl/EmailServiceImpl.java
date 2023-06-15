@@ -21,7 +21,7 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendEmailAlert(EmailDetails emailDetails) {
-        try{
+        try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(senderEmail);
             message.setSubject(emailDetails.getSubject());
@@ -30,8 +30,8 @@ public class EmailServiceImpl implements EmailService {
 
             javaMailSender.send(message);
             log.info("Message sent successfully");
-        } catch (Exception e){
-            log.error("Error sending email {}",e.getMessage());
+        } catch (Exception e) {
+            log.error("Error sending email {}", e.getMessage());
         }
     }
 }
