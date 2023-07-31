@@ -17,4 +17,9 @@ public class BankConstants {
     public static final String INSUFFICIENT_BALANCE_MESSAGE = "Insufficient Balance";
     public static final String ACCOUNT_DEBITED_SUCCESS = "007";
     public static final String ACCOUNT_DEBITED_MESSAGE = "Account has been successfully debited";
+    public static final String TRANSFER_SUCCESS = "200";
+    public static final String TRANSFER_SUCCESS_MESSAGE = "Amount has been successfully transfered";
+    public static final String ACCOUNT_ALREADY_EXIST = "500";
+    public static final String ACCOUNT_ALREADY_EXIST_MESSAGE = "Bank Account already exists";
+
 }

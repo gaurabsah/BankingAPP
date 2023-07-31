@@ -4,6 +4,7 @@ import com.app.bank.dto.*;
 import com.app.bank.model.User;
 import com.app.bank.repository.UserRepository;
 import com.app.bank.service.EmailService;
+import com.app.bank.service.TransactionService;
 import com.app.bank.service.UserService;
 import com.app.bank.util.AccountUtils;
 import com.app.bank.util.BankConstants;
@@ -21,12 +22,21 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private EmailService emailService;
-    private BankResponse build;
+
+    @Autowired
+    private TransactionService transactionService;
 
     @Override
     public BankResponse createAccount(UserRequest userRequest) {
-        if (userRepository.existsByEmail(userRequest.getEmail())) {
-            return build;
+        Boolean existsByEmail = userRepository.existsByEmail(userRequest.getEmail());
+        if (existsByEmail) {
+            return BankResponse.builder()
+                    .responseCode(BankConstants.ACCOUNT_ALREADY_EXIST)
+                    .responseMessage(BankConstants.ACCOUNT_ALREADY_EXIST_MESSAGE)
+                    .accountInfo(AccountInfo.builder()
+                            .accountName(userRequest.getFirstName() + " " + userRequest.getLastName())
+                            .build())
+                    .build();
         }
         User newUser = User.builder()
                 .firstName(userRequest.getFirstName())
@@ -51,7 +61,7 @@ public class UserServiceImpl implements UserService {
                 .message("Congratulations " + savedUser.getFirstName() + ", Your Account has been created successfully.\nYour Account Details:\n" +
                         "Account Name: " + savedUser.getFirstName() + " " + savedUser.getLastName() + "\n" +
                         "Account Number: " + savedUser.getAccountNumber().toString() + "\n" +
-                        "Account Balance: " + savedUser.getAccountBalance()+"\n" +
+                        "Account Balance: " + savedUser.getAccountBalance() + "\n" +
                         "\n" +
                         "Thanks & Regards")
 //                .attachments()
@@ -89,7 +99,7 @@ public class UserServiceImpl implements UserService {
     public BankResponse balanceEnquiry(EnquiryRequest request) {
         //check if the provided account number exists in the db
         boolean isAccountExist = userRepository.existsByAccountNumber(request.getAccountNumber());
-        if (!isAccountExist){
+        if (!isAccountExist) {
             return BankResponse.builder()
                     .responseCode(BankConstants.ACCOUNT_NOT_EXIST_CODE)
                     .responseMessage(BankConstants.ACCOUNT_NOT_EXIST_MESSAGE)
@@ -112,7 +122,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public String nameEnquiry(EnquiryRequest request) {
         boolean isAccountExist = userRepository.existsByAccountNumber(request.getAccountNumber());
-        if (!isAccountExist){
+        if (!isAccountExist) {
             return BankConstants.ACCOUNT_NOT_EXIST_MESSAGE;
         }
         User foundUser = userRepository.findByAccountNumber(request.getAccountNumber());
@@ -123,7 +133,7 @@ public class UserServiceImpl implements UserService {
     public BankResponse creditAccount(CreditDebitRequest request) {
         //checking if the account exists
         boolean isAccountExist = userRepository.existsByAccountNumber(request.getAccountNumber());
-        if (!isAccountExist){
+        if (!isAccountExist) {
             return BankResponse.builder()
                     .responseCode(BankConstants.ACCOUNT_NOT_EXIST_CODE)
                     .responseMessage(BankConstants.ACCOUNT_NOT_EXIST_MESSAGE)
@@ -134,6 +144,16 @@ public class UserServiceImpl implements UserService {
         User userToCredit = userRepository.findByAccountNumber(request.getAccountNumber());
         userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(request.getAmount()));
         userRepository.save(userToCredit);
+
+//        save transaction
+        TransactionDto tx = TransactionDto.builder()
+                .accountNumber(userToCredit.getAccountNumber())
+                .transactionType("Credit")
+                .amount(request.getAmount())
+                .status("")
+                .build();
+
+        transactionService.saveTransaction(tx);
 
         return BankResponse.builder()
                 .responseCode(BankConstants.ACCOUNT_CREDITED_SUCCESS)
@@ -151,7 +171,7 @@ public class UserServiceImpl implements UserService {
         //check if the account exists
         //check if the amount you intend to withdraw is not more than the current account balance
         boolean isAccountExist = userRepository.existsByAccountNumber(request.getAccountNumber());
-        if (!isAccountExist){
+        if (!isAccountExist) {
             return BankResponse.builder()
                     .responseCode(BankConstants.ACCOUNT_NOT_EXIST_CODE)
                     .responseMessage(BankConstants.ACCOUNT_NOT_EXIST_MESSAGE)
@@ -160,18 +180,27 @@ public class UserServiceImpl implements UserService {
         }
 
         User userToDebit = userRepository.findByAccountNumber(request.getAccountNumber());
-        BigInteger availableBalance =userToDebit.getAccountBalance().toBigInteger();
+        BigInteger availableBalance = userToDebit.getAccountBalance().toBigInteger();
         BigInteger debitAmount = request.getAmount().toBigInteger();
-        if ( availableBalance.intValue() < debitAmount.intValue()){
+        if (availableBalance.intValue() < debitAmount.intValue()) {
             return BankResponse.builder()
                     .responseCode(BankConstants.INSUFFICIENT_BALANCE_CODE)
                     .responseMessage(BankConstants.INSUFFICIENT_BALANCE_MESSAGE)
                     .accountInfo(null)
                     .build();
-        }
-        else {
+        } else {
             userToDebit.setAccountBalance(userToDebit.getAccountBalance().subtract(request.getAmount()));
             userRepository.save(userToDebit);
+            //        save transaction
+            TransactionDto tx = TransactionDto.builder()
+                    .accountNumber(userToDebit.getAccountNumber())
+                    .transactionType("Debit")
+                    .amount(request.getAmount())
+                    .status("")
+                    .build();
+
+            transactionService.saveTransaction(tx);
+
             return BankResponse.builder()
                     .responseCode(BankConstants.ACCOUNT_DEBITED_SUCCESS)
                     .responseMessage(BankConstants.ACCOUNT_DEBITED_MESSAGE)
@@ -183,6 +212,84 @@ public class UserServiceImpl implements UserService {
                     .build();
         }
 
+    }
+
+    @Override
+    public BankResponse transfer(TransferRequest request) {
+//        get the account to debit(check)
+//        check if the amount debiting is not more than current account balance
+//        debit the account
+//        get the account to credit (check)
+//        credit the account
+
+
+        boolean isDestinationAccountExist = userRepository.existsByAccountNumber(request.getDestinationAccountNumber());
+        if (!isDestinationAccountExist) {
+            return BankResponse.builder()
+                    .responseCode(BankConstants.ACCOUNT_NOT_EXIST_CODE)
+                    .responseMessage(BankConstants.ACCOUNT_NOT_EXIST_MESSAGE)
+                    .accountInfo(null)
+                    .build();
+        }
+
+        User sourceAccountUser = userRepository.findByAccountNumber(request.getSourceAccountNumber());
+        if (request.getAmount().compareTo(sourceAccountUser.getAccountBalance()) < 0) {
+            return BankResponse.builder()
+                    .responseCode(BankConstants.INSUFFICIENT_BALANCE_CODE)
+                    .responseMessage(BankConstants.INSUFFICIENT_BALANCE_MESSAGE)
+                    .accountInfo(null)
+                    .build();
+        }
+
+        sourceAccountUser.setAccountBalance(sourceAccountUser.getAccountBalance().subtract(request.getAmount()));
+        userRepository.save(sourceAccountUser);
+
+        //        save transaction
+        TransactionDto tx = TransactionDto.builder()
+                .accountNumber(sourceAccountUser.getAccountNumber())
+                .transactionType("Transfer/Credit")
+                .amount(request.getAmount())
+                .status("")
+                .build();
+
+        transactionService.saveTransaction(tx);
+
+        EmailDetails debitAlert = EmailDetails.builder()
+                .subject("DEBIT ALERT")
+                .recipient(sourceAccountUser.getEmail())
+                .message(request.getAmount() + " has been debited from your account. Your updated account balance is " + sourceAccountUser.getAccountBalance())
+                .build();
+
+        emailService.sendEmailAlert(debitAlert);
+
+        User destinationAccountUser = userRepository.findByAccountNumber(request.getDestinationAccountNumber());
+        destinationAccountUser.setAccountBalance(destinationAccountUser.getAccountBalance().add(request.getAmount()));
+        userRepository.save(destinationAccountUser);
+
+        //        save transaction
+        TransactionDto tx1 = TransactionDto.builder()
+                .accountNumber(destinationAccountUser.getAccountNumber())
+                .transactionType("Transfer/Credit")
+                .amount(request.getAmount())
+                .status("")
+                .build();
+
+        transactionService.saveTransaction(tx1);
+
+        EmailDetails creditAlert = EmailDetails.builder()
+                .subject("CREDIT ALERT")
+                .recipient(destinationAccountUser.getEmail())
+                .message(request.getAmount() + " has been credited to your account. Your updated account balance is " + destinationAccountUser.getAccountBalance())
+                .build();
+
+        emailService.sendEmailAlert(creditAlert);
+
+
+        return BankResponse.builder()
+                .responseCode(BankConstants.TRANSFER_SUCCESS)
+                .responseMessage(BankConstants.TRANSFER_SUCCESS_MESSAGE)
+                .accountInfo(null)
+                .build();
     }
 
 }
